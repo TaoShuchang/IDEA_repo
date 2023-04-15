@@ -27,7 +27,7 @@ Unzip the  `idea_Data_Split.zip`, and put the two folders (`datasets` and `split
 
 
 
-##Attacked graphs 
+## Attacked graphs 
 
 Download the attacked graphs used in our paper from [Here](https://drive.google.com/file/d/1fcpPBgSF_Kkexx4egSN8ShqArWByh1Fl/view?usp=share_link). 
 
