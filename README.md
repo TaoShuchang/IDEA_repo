@@ -7,7 +7,7 @@ Submitted to KDD 2023  [openreview](https://openreview.net/forum?id=mQy_8YPulG)
 
 ## Datasets and splits
 
-- Download  Cora, Citeseer, ogbarxiv, ogbproducts (the subgraph in our paper), Reddit (the subgraph in our paper) from this [Here](https://drive.google.com/file/d/1xD2GReVHaN7zUTSfM8lXDie9NtpiyP0g/view?usp=share_link).
+- Download  Cora, Citeseer, ogbarxiv, ogbproducts (the subgraph in our paper), Reddit (the subgraph in our paper) from [Here](https://drive.google.com/file/d/1xD2GReVHaN7zUTSfM8lXDie9NtpiyP0g/view?usp=share_link).
 
 - Dowload the train/val/test splits mentioned in our paper are also include in the above link [Here](https://drive.google.com/file/d/1xD2GReVHaN7zUTSfM8lXDie9NtpiyP0g/view?usp=share_link). Please note that, for Cora and Citeseer, we adopt the commonly used splits which are included in `datasets/Cora/` and `datasets/Citeseer/`.
 
