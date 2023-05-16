@@ -523,7 +523,7 @@ def propagation_matrix(adj, alpha=0.85, sigma=1):
     """
     deg = adj.sum(1)
     deg_min_sig = torch.matrix_power(torch.diag(deg), -sigma)
-    # 为了节省内存 100m
+ 
     if sigma - 1 == 0:
         deg_sig_min = torch.diag(torch.ones_like(deg))
     else:
@@ -541,11 +541,9 @@ def get_filelist(cur_dir, Filelist, name=''):
     newDir = cur_dir
     if os.path.isfile(cur_dir) and name in cur_dir:
         Filelist.append(cur_dir)
-        # # 若只是要返回文件文，使用这个
         # Filelist.append(os.path.basename(dir))
     elif os.path.isdir(cur_dir):
         for s in os.listdir(cur_dir):
-            # 如果需要忽略某些文件夹，使用以下代码
             if "others" in s:
                 continue
             newDir=os.path.join(cur_dir,s)
