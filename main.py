@@ -227,8 +227,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int,default=256)
     parser.add_argument('--patience', type=int,default=500)
     # IDEA
-    parser.add_argument('--lambda_inv_risks', type=int,default=10)
-    parser.add_argument('--lambda_beta', type=float, default=1e-4)
+    parser.add_argument('--alpha', type=int,default=10)
     parser.add_argument('--enable_bn', type=bool,default=True)
     parser.add_argument('--num_mlp_layers', type=int,default=2)
     parser.add_argument('--num_atks', type=int,default=3)
