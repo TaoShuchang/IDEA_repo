@@ -1,12 +1,12 @@
 # Poisoning attack (MetaAttack) at training time
 # Cora
-python -u main.py --dataset cora --lambda_inv_risks 100 --num_sample 2 --perturb_size 1e-4
+python -u main.py --dataset cora --alpha 100  --env_num 10 --num_sample 2 --perturb_size 1e-4
 
 # Citeseer
-python -u main.py --dataset citeseer  --lambda_inv_risks 50 --perturb_size 1e-4
+python -u main.py --dataset citeseer  --alpha 50 --perturb_size 1e-4
 
 # Reddit
-python -u main.py --dataset reddit --lambda_inv_risks 100 --suffix idea --num_sample 2 --perturb_size 1e-4
+python -u main.py --dataset reddit --alpha 100 --suffix idea --num_sample 2 --perturb_size 1e-4
 
 # ogbn-products
 python -u main.py --dataset ogbproducts --num_sample 4 
