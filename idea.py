@@ -180,7 +180,7 @@ class IDEA(nn.Module):
         nei_loss = (inv_loss_nei - env_loss_nei) ** 2
         # use beta to balance the info loss.
 
-        total_loss = inv_loss + env_loss + self.opts['lambda_inv_risks'] * irm_loss + self.opts['lambda_inv_risks'] * nei_loss
+        total_loss = inv_loss + env_loss + self.opts['alpha'] * irm_loss + self.opts['alpha'] * nei_loss
         tr = self.compute_env_vect(all_pred[sub_batch], all_labels[sub_batch], ori_all_z[sub_batch], domain_class[sub_batch], self.device)
         pearson_arr = torch.cat([pearsonr(tr[i], tr[j]) for j in range(len(tr)) for i in range(j+1, len(tr))])
         pearson_loss = pearson_arr.sum()
