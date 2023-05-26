@@ -9,7 +9,7 @@ Submitted to NeurIPS 2023
 
 - Download  Cora, Citeseer, ogbarxiv, ogbproducts (the subgraph in our paper), Reddit (the subgraph in our paper) from [Here](https://drive.google.com/file/d/1xD2GReVHaN7zUTSfM8lXDie9NtpiyP0g/view?usp=share_link).
 
-- Dowload the train/val/test splits mentioned in our paper are also include in the above link [Here](https://drive.google.com/file/d/1xD2GReVHaN7zUTSfM8lXDie9NtpiyP0g/view?usp=share_link). Please note that, for Cora and Citeseer, we adopt the commonly used splits which are included in `datasets/Cora/` and `datasets/Citeseer/`.
+- Dowload the train/val/test splits mentioned in our paper are also include in the above link. Please note that, for Cora and Citeseer, we adopt the commonly used splits which are included in `datasets/Cora/` and `datasets/Citeseer/`.
 
 Unzip the  `idea_Data_Split.zip`, and put the two folders (`datasets` and `splits`) in this directory.
 
@@ -29,7 +29,7 @@ Unzip the  `idea_Data_Split.zip`, and put the two folders (`datasets` and `split
 
 ## Attacked graphs 
 
-Download the attacked graphs used in our paper from [Here](https://drive.google.com/file/d/1fcpPBgSF_Kkexx4egSN8ShqArWByh1Fl/view?usp=share_link). 
+Download the attacked graphs used in our paper from [Here](https://drive.google.com/file/d/17hioKNvJUHLiRCgeO4suRU7dB19H6yMG/view?usp=sharing). 
 
 Unzip `attacked_graph.zip`, and put the folder `attacked_graphs` in this directory.
 
