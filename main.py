@@ -29,7 +29,7 @@ def training(model, adj_tensor, nor_adj_tensor, feat, labels, atk_idx, train_mas
     batch_loader = Data.DataLoader(dataset=torch_dataset, batch_size=opts['batch_size'], num_workers=24)
     iter_loader = iter(batch_loader)
     optimizer_aug = torch.optim.AdamW([{'params':model.gl.parameters(), 'lr':args.lr_a}, {'params':model.fl.parameters(), 'lr':args.lr_f}])
-    optimizer_env = torch.optim.AdamW(model.infenv.parameters(), lr=args.lr_e)
+    optimizer_dom = torch.optim.AdamW(model.infdom.parameters(), lr=args.lr_e)
     best_acc_val = 0
     cur_patience = args.patience
     for iteration in range(args.st_epoch, args.epochs + 1):
@@ -38,7 +38,7 @@ def training(model, adj_tensor, nor_adj_tensor, feat, labels, atk_idx, train_mas
             if opts['batch_size'] < train_mask.shape[0]:
                 iter_loader, batch = _fetch_data(iter_dataloader=iter_loader, dataloader=batch_loader)
                 batch_x = batch[0]
-            total_loss, inv_loss, pearson_loss, irm_loss, logvar, z_max = model.all_update_env_nei(feat, adj_tensor, nor_adj_tensor, labels, atk_idx, batch_x, nei_list, pert_tensor, col_idx, use_tr_idx)
+            total_loss, inv_loss, pearson_loss, irm_loss, logvar, z_max = model.all_update_dom_nei(feat, adj_tensor, nor_adj_tensor, labels, atk_idx, batch_x, nei_list, pert_tensor, col_idx, use_tr_idx)
             if m == 0:
                 model.optimizer.zero_grad()
                 total_loss.backward()
@@ -49,10 +49,10 @@ def training(model, adj_tensor, nor_adj_tensor, feat, labels, atk_idx, train_mas
                 gen_loss.backward()
                 optimizer_aug.step()
             else:
-                infenv_loss = pearson_loss 
-                optimizer_env.zero_grad()
-                infenv_loss.backward()
-                optimizer_env.step()
+                infdom_loss = pearson_loss 
+                optimizer_dom.zero_grad()
+                infdom_loss.backward()
+                optimizer_dom.step()
         model.eval()
         logits = model.predict(feat, nor_adj_tensor)
         train_acc = accuracy(logits[train_mask], labels[train_mask])
@@ -62,8 +62,8 @@ def training(model, adj_tensor, nor_adj_tensor, feat, labels, atk_idx, train_mas
                 print("IT {:05d} | TotalLoss {:.4f} | GenLoss {:.4f} | zMax {:.4f} | TrainAcc {:.5f} | ValAcc: {:.5f} ".format(
                     iteration, total_loss, gen_loss, z_max, train_acc, val_acc))
             else:
-                print("IT {:05d} | TotalLoss {:.4f} | GenLoss {:.4f} | InfenvLoss {:.4f} | zMax {:.4f} | TrainAcc {:.5f} | ValAcc: {:.5f} ".format(
-                    iteration, total_loss, gen_loss, infenv_loss, z_max, train_acc, val_acc))
+                print("IT {:05d} | TotalLoss {:.4f} | GenLoss {:.4f} | InfdomLoss {:.4f} | zMax {:.4f} | TrainAcc {:.5f} | ValAcc: {:.5f} ".format(
+                    iteration, total_loss, gen_loss, infdom_loss, z_max, train_acc, val_acc))
         if val_acc > best_acc_val:
             best_acc_val = val_acc
             weights = deepcopy(model.state_dict())
@@ -131,10 +131,8 @@ def main(opts):
     atk_idx = torch.diag(torch.arange(args.num_atks)).to(device)
     acc_test_arr = []
     atk_flag = 0
-    pert_rate = np.arange(0.0, 0.3, 0.05)
-    # pert_rate = np.arange(0.1, 0.2, 0.05)
-    # pert_rate = np.arange(0.2, 0.3, 0.05)
-    # pert_rate = np.array([0.25])
+    pert_rate = np.arange(0.0, 0.25, 0.05)
+
     for pert in pert_rate:
         print('------------------- Perturbation', pert, '-------------------')
         if pert > 0:
@@ -233,8 +231,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_atks', type=int,default=3)
     parser.add_argument('--lr_f', type=float, default=1e-4,  help='learning rate for features')
     parser.add_argument('--lr_e', type=float, default=1e-4,  help='learning rate for inferring environment')
-    parser.add_argument('--hidden_dim_infenv', type=int, default=16)
-    parser.add_argument('--env_num', type=int, default=10)
+    parser.add_argument('--hidden_dim_infdom', type=int, default=16)
+    parser.add_argument('--dom_num', type=int, default=10)
     parser.add_argument('--clf_dropout', type=float, default=0)
     
      # for graph edit model
