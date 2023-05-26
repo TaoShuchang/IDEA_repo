@@ -132,7 +132,7 @@ if __name__ == '__main__':
     parser.add_argument('--test-freq', type=int, default=1)
     parser.add_argument('--attack', type=str, default='flag')
     parser.add_argument('--dataset', type=str, default='ogbarxiv')
-    parser.add_argument('--suffix', type=str, default='all')
+    parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--atk_suffix', type=str, default='', help='Whether is attack')
     # put a layer norm right after input
     parser.add_argument('--layer_norm_first', default=True)
@@ -148,8 +148,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_atks', type=int,default=3)
     parser.add_argument('--lr_f', type=float, default=1e-4,  help='learning rate for features')
     parser.add_argument('--lr_e', type=float, default=1e-4,  help='learning rate for inferring environment')
-    parser.add_argument('--hidden_dim_infenv', type=int, default=16)
-    parser.add_argument('--env_num', type=int, default=10)
+    parser.add_argument('--hidden_dim_infdom', type=int, default=16)
+    parser.add_argument('--dom_num', type=int, default=10)
     parser.add_argument('--clf_dropout', type=float, default=0)
     
      # for graph edit model
