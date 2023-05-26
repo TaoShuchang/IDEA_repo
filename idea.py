@@ -12,12 +12,9 @@ from torch.autograd import Variable
 from audtorch.metrics.functional import pearsonr
 # import networks
 
-sys.path.append('..')
 from utils import *
-# from gnn_model.gin import MLP, GIN
-# from gnn_model.gcn import GCN
-from Baselines.FLAG.gcn_pyg import GCN
-# from Defenses.GCN.run_gcn_ogb import GCN
+from gcn import GCN
+
 
 
 
@@ -70,12 +67,12 @@ class MLP(nn.Module):
             return self.linears[self.num_layers - 1](h)
 
 
-class InfEnv(nn.Module):
+class Infdom(nn.Module):
     def __init__(self, opts, z_dim, class_num, dropout=0):
-        super(InfEnv, self).__init__()
+        super(Infdom, self).__init__()
         self.dropout = dropout
-        self.lin1 = nn.Linear(z_dim, opts['hidden_dim_infenv'])
-        self.lin2 = nn.Linear(opts['hidden_dim_infenv'], class_num)
+        self.lin1 = nn.Linear(z_dim, opts['hidden_dim_infdom'])
+        self.lin2 = nn.Linear(opts['hidden_dim_infdom'], class_num)
         for lin in [self.lin1, self.lin2]:
             nn.init.xavier_uniform_(lin.weight)
             nn.init.zeros_(lin.bias)
@@ -93,11 +90,8 @@ class IDEA(nn.Module):
         self.opts = opts
         self.device = device
         num_mlp_layers = opts['num_mlp_layers']
-        # super(IIB, self).__init__(input_shape, num_classes, num_domains, opts)
-        # self.featurizer = GCN(input_dim, hid_dim, hid_dim, opts['num_layers'], dropout, layer_norm_first=opts['layer_norm_first'], use_ln=opts['use_ln']).float()
         self.featurizer = GCN(input_dim, hid_dim, hid_dim, opts['num_layers'], dropout).to(device)
 
-        # self.classifier = MLP(num_mlp_layers, hid_dim, hid_dim, num_classes)
         feat_dim = hid_dim
         # VIB archs
         if opts['enable_bn']:
@@ -116,18 +110,15 @@ class IDEA(nn.Module):
                 nn.Linear(feat_dim, feat_dim),
                 nn.ReLU(inplace=True)
             )
-        self.fc3_mu = nn.Linear(feat_dim, feat_dim)  # output = CNN embedding latent variables
-        self.fc3_logvar = nn.Linear(feat_dim, feat_dim)  # output = CNN embedding latent variables
-        # Inv Risk archs
-        # fi
-        self.inv_classifier = MLP(num_mlp_layers, hid_dim, hid_dim, num_classes, dropout=self.opts['clf_dropout'])
-        # fd
-        self.env_classifier = MLP(num_mlp_layers, hid_dim+opts['env_num'], hid_dim+opts['env_num'], num_classes, dropout=self.opts['clf_dropout'])
+        self.fc3_mu = nn.Linear(feat_dim, feat_dim) 
+        self.fc3_logvar = nn.Linear(feat_dim, feat_dim) 
+        self.g_classifier = MLP(num_mlp_layers, hid_dim, hid_dim, num_classes, dropout=self.opts['clf_dropout'])
+        self.gd_classifier = MLP(num_mlp_layers, hid_dim+opts['dom_num'], hid_dim+opts['dom_num'], num_classes, dropout=self.opts['clf_dropout'])
         
         
         self.optimizer = torch.optim.Adam(
-            list(self.featurizer.parameters()) + list(self.inv_classifier.parameters()) + list(
-                self.env_classifier.parameters()) + list(self.encoder.parameters()) + list(
+            list(self.featurizer.parameters()) + list(self.g_classifier.parameters()) + list(
+                self.gd_classifier.parameters()) + list(self.encoder.parameters()) + list(
                 self.fc3_mu.parameters()) + list(self.fc3_logvar.parameters()),
             lr=self.opts["lr"],
             weight_decay=self.opts['weight_decay']
@@ -135,7 +126,7 @@ class IDEA(nn.Module):
         self.n = n
         self.gl = Graph_Editer(tr_n, use_tr_n, n, device)
         self.fl = Feat_Editer((n, input_dim), opts['perturb_size'], device)
-        self.infenv = InfEnv(opts, z_dim=hid_dim+opts['num_atks'], class_num=opts['env_num'], dropout=dropout).cuda()
+        self.infdom = Infdom(opts, z_dim=hid_dim+opts['num_atks'], class_num=opts['dom_num'], dropout=dropout).cuda()
 
     def encoder_fun(self, res_feat):
         latent_z = self.encoder(res_feat)
@@ -152,9 +143,8 @@ class IDEA(nn.Module):
             return mu
 
 
-    def all_update_env_nei(self, feat, adj_tensor, nor_adj_tensor, labels, atk_idx, batch, nei_list, pert_tensor, col_idx, use_tr_idx):
+    def all_update_dom_nei(self, feat, adj_tensor, nor_adj_tensor, labels, atk_idx, batch, nei_list, pert_tensor, col_idx, use_tr_idx):
         nei_batch, sub_batch, batch = sample_neighbor(batch, nei_list)
-        # sub_batch = one_order_nei
         atk_idx = atk_idx.repeat_interleave(batch.shape[0], dim=0)
         z = self.featurizer(feat, nor_adj_tensor)
         # structure
@@ -169,38 +159,35 @@ class IDEA(nn.Module):
         mu, logvar = self.encoder_fun(ori_all_z)
         all_z = self.reparameterize(mu, logvar)
 
-        domain_class = self.infenv(torch.cat([all_z.detach(), atk_idx],1))
+        domain_class = self.infdom(torch.cat([all_z.detach(), atk_idx],1))
         # calculate loss by parts
-        all_pred = self.inv_classifier(all_z)
+        all_pred = self.g_classifier(all_z)
         inv_loss = F.cross_entropy(all_pred[sub_batch], all_labels[sub_batch])
-        env_loss = F.cross_entropy(self.env_classifier(torch.cat([all_z[sub_batch], domain_class[sub_batch]], 1)), all_labels[sub_batch])
-        irm_loss = (inv_loss - env_loss) ** 2
+        dom_loss = F.cross_entropy(self.gd_classifier(torch.cat([all_z[sub_batch], domain_class[sub_batch]], 1)), all_labels[sub_batch])
+        irm_loss = (inv_loss - dom_loss) ** 2
         inv_loss_nei = F.cross_entropy(all_pred[nei_batch], all_labels[sub_batch])
-        env_loss_nei = F.cross_entropy(self.env_classifier(torch.cat([all_z[nei_batch], domain_class[sub_batch]], 1)), all_labels[sub_batch])
-        nei_loss = (inv_loss_nei - env_loss_nei) ** 2
+        dom_loss_nei = F.cross_entropy(self.gd_classifier(torch.cat([all_z[nei_batch], domain_class[sub_batch]], 1)), all_labels[sub_batch])
+        nei_loss = (inv_loss_nei - dom_loss_nei) ** 2
         # use beta to balance the info loss.
 
-        total_loss = inv_loss + env_loss + self.opts['alpha'] * irm_loss + self.opts['alpha'] * nei_loss
-        tr = self.compute_env_vect(all_pred[sub_batch], all_labels[sub_batch], ori_all_z[sub_batch], domain_class[sub_batch], self.device)
+        total_loss = inv_loss + dom_loss + self.opts['alpha'] * irm_loss + self.opts['alpha'] * nei_loss
+        tr = self.compute_dom_vect(all_pred[sub_batch], all_labels[sub_batch], ori_all_z[sub_batch], domain_class[sub_batch], self.device)
         pearson_arr = torch.cat([pearsonr(tr[i], tr[j]) for j in range(len(tr)) for i in range(j+1, len(tr))])
         pearson_loss = pearson_arr.sum()
         return total_loss, inv_loss, pearson_loss, irm_loss, logvar, all_z.max().item()
     
 
-    def compute_env_vect(self, pred, labels, all_z, domain_class, device):
-        env_label = domain_class.argmax(1)
+    def compute_dom_vect(self, pred, labels, all_z, domain_class, device):
+        dom_label = domain_class.argmax(1)
         eps_num = 100
         tr = []
         z_num, z_dim = all_z.shape
         eps = torch.randn(eps_num, device=device)/100
         # x = torch.randn(z_dim,1).to(device)
-        for idx in torch.unique(env_label):
-            envidx = torch.where(env_label==idx)[0]
-            # XXx = sum([torch.mm(all_z[i].reshape(z_dim, 1), (pred[i,labels[i]] - 1).reshape(1, 1))for i in envidx])
-            # XXx = sum([all_z[i].reshape(z_dim, 1)*(pred[i,labels[i]] - 1)for i in envidx])
-            XXx = (all_z[envidx].T.mul(pred[envidx, labels[envidx]] - 1)).sum(1)
-            # Xeps = sum([all_z[envidx]*e  for e in eps]).sum(0)
-            Xeps = all_z[envidx].sum(0)*eps.sum()
+        for idx in torch.unique(dom_label):
+            domidx = torch.where(dom_label==idx)[0]
+            XXx = (all_z[domidx].T.mul(pred[domidx, labels[domidx]] - 1)).sum(1)
+            Xeps = all_z[domidx].sum(0)*eps.sum()
             tr.append(XXx - Xeps)
         return tr
 
@@ -233,7 +220,7 @@ class IDEA(nn.Module):
         # mu, logvar = self.encoder_fun(z[batch])
         mu, logvar = self.encoder_fun(z)
         z = self.reparameterize(mu, logvar)
-        y = self.inv_classifier(z)
+        y = self.g_classifier(z)
         return y
 
 
