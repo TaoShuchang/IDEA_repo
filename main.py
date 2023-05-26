@@ -99,6 +99,7 @@ def main(opts):
 
     save_file = 'checkpoint/' + args.dataset + suffix
     graph_file = f'attacked_graphs/poison/{args.dataset}/meta_' 
+    log_file = 'log/' + args.dataset + '_' + args.dataset + '.csv'
     nei_list = np.aload(prefile + 'splits/neighbors/' + args.dataset + '_nei.npy')
     target_nodes = np.load(prefile + 'splits/target_nodes/' + args.dataset+ '_tar.npy')
 
@@ -162,7 +163,6 @@ def main(opts):
             print("Test accuracy {:.4f}".format(test_acc))
             acc_test_arr.append(test_acc)
             acc_test_arr_in.append(test_acc)
-        file = 'log/' + args.dataset + '/' + args.dataset + '.csv'
         
         nseed = len(seeds)
         ncol = int(len(acc_test_arr_in)/nseed)
@@ -170,28 +170,26 @@ def main(opts):
         acc_test_f_in = np.concatenate((acc_test_arr_in, acc_test_arr_in.mean(0).reshape(1, ncol), acc_test_arr_in.std(0).reshape(1, ncol)))
         print('acc_test_arr', acc_test_arr_in.shape)
         dataframe_test =  pd.DataFrame(acc_test_f_in[-2:])
-        with open(file, 'a') as f:
+        with open(log_file, 'a') as f:
             writer = csv.writer(f)
             writer.writerow(['=====',args.suffix, f'_pert{pert:.2f}_seed','====='])
             writer.writerow(['---Test ACC---'])
         # dataframe = pd.DataFrame({u'graph_name_arr':graph_name_arr, u'acc_test':acc_test_arr, u'acc_target':acc_tar_arr})
-        dataframe_test.to_csv(file, mode='a', index=False)
-            
-            
-    file = 'log/' + args.dataset + '/' + args.dataset + '.csv'
-    
+        dataframe_test.to_csv(log_file, mode='a', index=False)
+
+        
     nseed = len(seeds)
     nrow = int(len(acc_test_arr)/nseed)
     acc_test_arr = np.array(acc_test_arr).reshape(nrow, nseed) * 100
     # acc_test_f = np.concatenate((acc_test_arr, acc_test_arr.mean(1).reshape(nrow,1), acc_test_arr.std(0).reshape(nrow, 1)))
     print('acc_test_arr', acc_test_arr.shape)
     dataframe_test =  pd.DataFrame({u'pert_rate':pert_rate, u'mean':acc_test_arr.mean(1), u'std':acc_test_arr.std(1)})
-    with open(file, 'a') as f:
+    with open(log_file, 'a') as f:
         writer = csv.writer(f)
         writer.writerow(['=====',args.suffix, f'all','====='])
         writer.writerow(['---Test ACC---'])
     # dataframe = pd.DataFrame({u'graph_name_arr':graph_name_arr, u'acc_test':acc_test_arr, u'acc_target':acc_tar_arr})
-    dataframe_test.to_csv(file, mode='a', index=False)
+    dataframe_test.to_csv(log_file, mode='a', index=False)
 
 
 
@@ -207,14 +205,11 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--epochs', type=int, default=10000)
-    parser.add_argument('--runs', type=int, default=10)
-    parser.add_argument('--start-seed', type=int, default=0)
     parser.add_argument('--counter', type=int, default=0, help='counter')
     parser.add_argument('--best_score', type=float, default=0., help='best score')
     parser.add_argument('--st_epoch', type=int, default=0, help='start epoch')
 
     parser.add_argument('--perturb_size', type=float, default=1e-3)
-    parser.add_argument('--test-freq', type=int, default=1)
     parser.add_argument('--dataset', type=str, default='ogbarxiv')
     parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--atk_suffix', type=str, default='seed123')
@@ -242,8 +237,6 @@ if __name__ == '__main__':
                         help='steps for graph learner before one step for GNN')
     parser.add_argument('--num_sample', type=int, default=8,
                         help='num of samples for each node with graph edit, attack budget')
-    parser.add_argument('--beta', type=float, default=1.0,
-                        help='weight for mean of risks from multiple domains')
     parser.add_argument('--lr_a', type=float, default=1e-4,
                         help='learning rate for graph learner with graph edit')
     args = parser.parse_args()
