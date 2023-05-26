@@ -28,6 +28,7 @@ def main(opts):
     prefile = './'
     save_file = 'checkpoint/' + dataset + suffix
     graphpath = prefile + 'attacked_graphs/evasion/' + args.dataset + '/' 
+    log_file = 'log/' + args.dataset + '_' + args.dataset + '_evasion.csv'
     target_nodes = np.load(prefile + 'splits/target_nodes/' + args.dataset+ '_tar.npy')
 
     # if args.atk_idea == 0:
@@ -72,8 +73,8 @@ def main(opts):
         tar_acc = accuracy(logp[target_nodes], labels[target_nodes])
         graph_name_arr.append('Clean')
         acc_tar_arr.append(tar_acc)
-        print("Validate accuracy {:.4%}".format(val_acc))
-        print("Test accuracy {:.4%}".format(test_acc))
+        # print("Validate accuracy {:.4%}".format(val_acc))
+        # print("Test accuracy {:.4%}".format(test_acc))
         print("Target accuracy {:.4%}".format(tar_acc))
         
         for graph in graph_save_file:
@@ -89,23 +90,23 @@ def main(opts):
             new_feat = torch.from_numpy(new_features.toarray().astype('double')).float().to(device)
             new_logits = model.predict(new_feat, new_nor_adj_tensor)
             new_logp = F.log_softmax(new_logits, dim=1)
-            acc = accuracy(new_logp[target_nodes], labels[target_nodes])
-            acc_tar_arr.append(acc)
+            tar_acc = accuracy(new_logp[target_nodes], labels[target_nodes])
+            acc_tar_arr.append(tar_acc)
 
-            print("Target acc {:.4%}".format(acc))
+            print("Target acc {:.4%}".format(tar_acc))
             print()    
-    file = 'log/' + args.dataset + '/' + args.dataset + '_evasion.csv'
+    
     nseed = len(seeds)
     ncol = int(len(acc_tar_arr)/nseed)
     acc_tar_arr = np.array(acc_tar_arr).reshape(nseed, ncol) * 100
     print('acc_tar_arr', acc_tar_arr.shape)
     dataframe_test =  pd.DataFrame({u'pert_rate':graph_name_arr, u'mean':acc_tar_arr.mean(0), u'std':acc_tar_arr.std(0)})
-    with open(file, 'a') as f:
+    with open(log_file, 'a') as f:
         writer = csv.writer(f)
         writer.writerow(['=====',args.suffix, f'all','====='])
-        writer.writerow(['---Test ACC---'])
-    # dataframe = pd.DataFrame({u'graph_name_arr':graph_name_arr, u'acc_test':acc_tar_arr, u'acc_target':acc_tar_arr})
-    dataframe_test.to_csv(file, mode='a', index=False)
+        writer.writerow(['---Target ACC---'])
+
+    dataframe_test.to_csv(log_file, mode='a', index=False)
 
 
 
@@ -121,15 +122,12 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--epochs', type=int, default=10000)
-    parser.add_argument('--runs', type=int, default=10)
-    parser.add_argument('--start-seed', type=int, default=0)
     parser.add_argument('--counter', type=int, default=0, help='counter')
     parser.add_argument('--best_score', type=float, default=0., help='best score')
     parser.add_argument('--st_epoch', type=int, default=0, help='start epoch')
 
     parser.add_argument('--perturb_size', type=float, default=1e-3)
     parser.add_argument('--m', type=int, default=3)
-    parser.add_argument('--test-freq', type=int, default=1)
     parser.add_argument('--attack', type=str, default='flag')
     parser.add_argument('--dataset', type=str, default='ogbarxiv')
     parser.add_argument('--suffix', type=str, default='')
@@ -141,8 +139,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int,default=256)
     parser.add_argument('--patience', type=int,default=500)
     # IDEA
-    parser.add_argument('--lambda_inv_risks', type=int,default=10)
-    parser.add_argument('--lambda_beta', type=float, default=1e-4)
+    parser.add_argument('--alpha', type=int,default=10)
     parser.add_argument('--enable_bn', type=bool,default=True)
     parser.add_argument('--num_mlp_layers', type=int,default=2)
     parser.add_argument('--num_atks', type=int,default=3)
@@ -159,8 +156,6 @@ if __name__ == '__main__':
                         help='steps for graph learner before one step for GNN')
     parser.add_argument('--num_sample', type=int, default=8,
                         help='num of samples for each node with graph edit, attack budget')
-    parser.add_argument('--beta', type=float, default=1.0,
-                        help='weight for mean of risks from multiple domains')
     parser.add_argument('--lr_a', type=float, default=1e-4,
                         help='learning rate for graph learner with graph edit')
     args = parser.parse_args()
