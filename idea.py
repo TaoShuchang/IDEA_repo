@@ -168,7 +168,6 @@ class IDEA(nn.Module):
         inv_loss_nei = F.cross_entropy(all_pred[nei_batch], all_labels[sub_batch])
         dom_loss_nei = F.cross_entropy(self.gd_classifier(torch.cat([all_z[nei_batch], domain_class[sub_batch]], 1)), all_labels[sub_batch])
         nei_loss = (inv_loss_nei - dom_loss_nei) ** 2
-        # use beta to balance the info loss.
 
         total_loss = inv_loss + dom_loss + self.opts['alpha'] * irm_loss + self.opts['alpha'] * nei_loss
         tr = self.compute_dom_vect(all_pred[sub_batch], all_labels[sub_batch], ori_all_z[sub_batch], domain_class[sub_batch], self.device)
