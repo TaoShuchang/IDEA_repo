@@ -6,7 +6,7 @@ python -u main.py --dataset cora --alpha 100  --dom_num 10
 python -u main.py --dataset citeseer  --alpha 100 --dom_num 10  --num_sample 8
 
 # Reddit
-python -u main.py --dataset reddit --alpha 100 --dom_num 10 --num_sample 4 --perturb_size 1e-3
+python -u main.py --dataset reddit --alpha 10 --dom_num 10 --num_sample 4 --perturb_size 1e-3
 
 # ogbn-products
 python -u main.py --dataset ogbproducts --alpha 10 --dom_num 10 --num_sample 4 --perturb_size 1e-3
