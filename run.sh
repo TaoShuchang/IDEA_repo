@@ -1,18 +1,18 @@
 # Poisoning attack (MetaAttack) at training time
 # Cora
-python -u main.py --dataset cora --alpha 100  --env_num 10 --num_sample 2 --perturb_size 1e-4
+python -u main.py --dataset cora --alpha 100  --dom_num 10 
 
 # Citeseer
-python -u main.py --dataset citeseer  --alpha 50 --perturb_size 1e-4
+python -u main.py --dataset citeseer  --alpha 100 --dom_num 10  --num_sample 8
 
 # Reddit
-python -u main.py --dataset reddit --alpha 100 --suffix idea --num_sample 2 --perturb_size 1e-4
+python -u main.py --dataset reddit --alpha 100 --dom_num 10 --num_sample 4 --perturb_size 1e-3
 
 # ogbn-products
-python -u main.py --dataset ogbproducts --num_sample 4 
+python -u main.py --dataset ogbproducts --alpha 10 --dom_num 10 --num_sample 4 --perturb_size 1e-3
 
 # ogbn-arxiv
-nohup python -u main.py --dataset ogbarxiv --num_sample 2
+nohup python -u main.py --dataset ogbarxiv --alpha 10 --dom_num 10 --perturb_size 1e-3
 
 
 # Evasion attack  (nettack, PGD, G-NIA, TDGIA) at testing time
