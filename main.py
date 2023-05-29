@@ -32,7 +32,7 @@ def training(model, adj_tensor, nor_adj_tensor, feat, labels, atk_idx, train_mas
     optimizer_dom = torch.optim.AdamW(model.infdom.parameters(), lr=args.lr_e)
     best_acc_val = 0
     cur_patience = args.patience
-    for iteration in range(args.st_epoch, args.epochs + 1):
+    for iteration in range(args.epochs + 1):
         model.train()
         for m in range(args.T):
             if opts['batch_size'] < train_mask.shape[0]:
@@ -205,12 +205,9 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--epochs', type=int, default=10000)
-    parser.add_argument('--counter', type=int, default=0, help='counter')
-    parser.add_argument('--best_score', type=float, default=0., help='best score')
-    parser.add_argument('--st_epoch', type=int, default=0, help='start epoch')
 
-    parser.add_argument('--perturb_size', type=float, default=1e-3)
-    parser.add_argument('--dataset', type=str, default='ogbarxiv')
+    parser.add_argument('--perturb_size', type=float, default=1e-4)
+    parser.add_argument('--dataset', type=str, default='cora')
     parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--atk_suffix', type=str, default='seed123')
     # put a layer norm right after input
@@ -220,7 +217,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int,default=256)
     parser.add_argument('--patience', type=int,default=500)
     # IDEA
-    parser.add_argument('--alpha', type=int,default=10)
+    parser.add_argument('--alpha', type=int,default=100)
     parser.add_argument('--enable_bn', type=bool,default=True)
     parser.add_argument('--num_mlp_layers', type=int,default=2)
     parser.add_argument('--num_atks', type=int,default=3)
@@ -235,7 +232,7 @@ if __name__ == '__main__':
                         help='num of views for data augmentation')
     parser.add_argument('--T', type=int, default=3,
                         help='steps for graph learner before one step for GNN')
-    parser.add_argument('--num_sample', type=int, default=8,
+    parser.add_argument('--num_sample', type=int, default=2,
                         help='num of samples for each node with graph edit, attack budget')
     parser.add_argument('--lr_a', type=float, default=1e-4,
                         help='learning rate for graph learner with graph edit')
