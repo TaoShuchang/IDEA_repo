@@ -56,7 +56,7 @@ class GraphConvolution(Module):
 
 class GCN(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers,
-                 dropout, layer_norm_first=False, use_ln=True):
+                 dropout, layer_norm_first=True, use_ln=False):
         super(GCN, self).__init__()
         self.layer_norm_first = layer_norm_first
         self.use_ln = use_ln
