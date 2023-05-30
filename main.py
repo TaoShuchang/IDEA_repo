@@ -210,10 +210,6 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='cora')
     parser.add_argument('--suffix', type=str, default='')
     parser.add_argument('--atk_suffix', type=str, default='seed123')
-    # put a layer norm right after input
-    parser.add_argument('--layer_norm_first', default=True)
-    # put layer norm between layers or not
-    parser.add_argument('--use_ln', type=int,default=0)
     parser.add_argument('--batch_size', type=int,default=256)
     parser.add_argument('--patience', type=int,default=500)
     # IDEA
