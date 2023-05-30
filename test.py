@@ -134,7 +134,7 @@ if __name__ == '__main__':
     parser.add_argument('--atk_suffix', type=str, default='', help='Whether is attack')
     parser.add_argument('--batch_size', type=int,default=256)
     parser.add_argument('--patience', type=int,default=500)
-    # IDEA
+
     parser.add_argument('--alpha', type=int,default=10)
     parser.add_argument('--enable_bn', type=bool,default=True)
     parser.add_argument('--num_mlp_layers', type=int,default=2)
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     parser.add_argument('--dom_num', type=int, default=10)
     parser.add_argument('--clf_dropout', type=float, default=0)
     
-     # for graph edit model
+
     parser.add_argument('--K', type=int, default=1,
                         help='num of views for data augmentation')
     parser.add_argument('--T', type=int, default=3,
