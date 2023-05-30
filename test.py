@@ -114,7 +114,6 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='IDEA')
 
-    # configure
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--num_layers', type=int, default=2)
     parser.add_argument('--hidden_channels', type=int, default=64)
