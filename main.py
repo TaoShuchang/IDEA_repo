@@ -18,9 +18,6 @@ from idea import IDEA
 from utils import *
 from utils import _fetch_data
 
-from ogb.nodeproppred import PygNodePropPredDataset
-from torch_geometric.data import DataLoader
-
 
 def training(model, adj_tensor, nor_adj_tensor, feat, labels, atk_idx, train_mask, val_mask, test_mask, nei_list, pert_tensor, col_idx, use_tr_idx):
     torch_dataset = Data.TensorDataset(torch.LongTensor(train_mask))
