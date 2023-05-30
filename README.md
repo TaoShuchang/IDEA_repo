@@ -7,7 +7,7 @@ Submitted to NeurIPS 2023
 
 ## Datasets and splits
 
-- Download  Cora, Citeseer, ogbarxiv, ogbproducts (the subgraph in our paper), Reddit (the subgraph in our paper) from [Here](hhttps://drive.google.com/file/d/11le9BFqRhPudZvgXiWE3nlhE-uUvOEhx/view?usp=share_link).
+- Download  Cora, Citeseer, ogbarxiv, ogbproducts (the subgraph in our paper), Reddit (the subgraph in our paper) from [Here](https://drive.google.com/file/d/11le9BFqRhPudZvgXiWE3nlhE-uUvOEhx/view?usp=share_link).
 
 - Dowload the train/val/test splits mentioned in our paper are also include in the above link. Please note that, for Cora and Citeseer, we adopt the commonly used splits which are included in `datasets/Cora/` and `datasets/Citeseer/`.
 
