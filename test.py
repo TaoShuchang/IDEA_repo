@@ -1,16 +1,12 @@
 import numpy as np
 import scipy.sparse as sp
-import time
 import csv
 import pandas as pd
 import os, sys
 import argparse
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.data as Data
-from copy import deepcopy
 from deeprobust.graph.utils import *
 from deeprobust.graph.data import Dataset
 import argparse
@@ -120,39 +116,28 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.5)
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
-    parser.add_argument('--epochs', type=int, default=10000)
-    parser.add_argument('--counter', type=int, default=0, help='counter')
-    parser.add_argument('--best_score', type=float, default=0., help='best score')
-    parser.add_argument('--st_epoch', type=int, default=0, help='start epoch')
-
-    parser.add_argument('--perturb_size', type=float, default=1e-3)
-    parser.add_argument('--m', type=int, default=3)
-    parser.add_argument('--attack', type=str, default='flag')
-    parser.add_argument('--dataset', type=str, default='ogbarxiv')
+    parser.add_argument('--epochs', type=int, default=5000)
+    
+    parser.add_argument('--dataset', type=str, default='cora')
     parser.add_argument('--suffix', type=str, default='')
-    parser.add_argument('--atk_suffix', type=str, default='', help='Whether is attack')
+    parser.add_argument('--atk_suffix', type=str, default='seed123')
     parser.add_argument('--batch_size', type=int,default=256)
     parser.add_argument('--patience', type=int,default=500)
 
-    parser.add_argument('--alpha', type=int,default=10)
+    parser.add_argument('--alpha', type=int,default=100)
+    parser.add_argument('--dom_num', type=int, default=10)
+    parser.add_argument('--lr_e', type=float, default=1e-4,  help='learning rate for inferring environment')
+    parser.add_argument('--hidden_dim_infdom', type=int, default=16)
+    parser.add_argument('--clf_dropout', type=float, default=0)
+    
     parser.add_argument('--enable_bn', type=bool,default=True)
     parser.add_argument('--num_mlp_layers', type=int,default=2)
     parser.add_argument('--num_atks', type=int,default=3)
-    parser.add_argument('--lr_f', type=float, default=1e-4,  help='learning rate for features')
-    parser.add_argument('--lr_e', type=float, default=1e-4,  help='learning rate for inferring environment')
-    parser.add_argument('--hidden_dim_infdom', type=int, default=16)
-    parser.add_argument('--dom_num', type=int, default=10)
-    parser.add_argument('--clf_dropout', type=float, default=0)
-    
+    parser.add_argument('--perturb_size', type=float, default=1e-3, help='feature adversarial examples: initial perturbation')
+    parser.add_argument('--lr_f', type=float, default=1e-4,  help='learning rate for feature adversarial examples')
+    parser.add_argument('--num_sample', type=int, default=4, help='structural adversarial example: attack budget')
+    parser.add_argument('--lr_a', type=float, default=1e-4, help='learning rate for structural adversarial examples')
 
-    parser.add_argument('--K', type=int, default=1,
-                        help='num of views for data augmentation')
-    parser.add_argument('--T', type=int, default=3,
-                        help='steps for graph learner before one step for GNN')
-    parser.add_argument('--num_sample', type=int, default=8,
-                        help='num of samples for each node with graph edit, attack budget')
-    parser.add_argument('--lr_a', type=float, default=1e-4,
-                        help='learning rate for graph learner with graph edit')
     args = parser.parse_args()
     opts = args.__dict__.copy()
     print('opts', opts)
