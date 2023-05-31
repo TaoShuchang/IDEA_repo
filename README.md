@@ -15,6 +15,15 @@ Unzip the  `idea_Data_Split.zip`, and put the two folders (`datasets` and `split
 
 
 
+
+## Attacked graphs 
+
+Download the attacked graphs used in our paper from [Here](https://drive.google.com/file/d/17hioKNvJUHLiRCgeO4suRU7dB19H6yMG/view?usp=sharing). 
+
+Unzip `attacked_graph.zip`, and put the folder `attacked_graphs` in this directory.
+
+
+
 ## Environment
 
 - python >= 3.9
@@ -23,16 +32,6 @@ Unzip the  `idea_Data_Split.zip`, and put the two folders (`datasets` and `split
 - numpy == 1.23.5
 - deeprobust
 - ogb
-
-
-
-
-## Attacked graphs 
-
-Download the attacked graphs used in our paper from [Here](https://drive.google.com/file/d/17hioKNvJUHLiRCgeO4suRU7dB19H6yMG/view?usp=sharing). 
-
-Unzip `attacked_graph.zip`, and put the folder `attacked_graphs` in this directory.
-
 
 
 ## Reproduce the results
