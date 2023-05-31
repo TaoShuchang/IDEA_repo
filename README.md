@@ -43,7 +43,7 @@ We provide to evaluate the robustness of IDEA by poisoning and evasion attacks.
   *Example Usage*
 
   ```python
-  python -u main.py --dataset cora --alpha 100  --env_num 10 --num_sample 2 --perturb_size 1e-4
+  python -u main.py --dataset cora --alpha 100  --dom_num 10  --device 1
   ```
 
 
