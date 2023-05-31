@@ -1,32 +1,32 @@
 # Poisoning attack (MetaAttack) at training time
 # Cora
-python -u main.py --dataset cora --alpha 100  --dom_num 10 
+nohup python -u main.py --dataset cora --alpha 100  --dom_num 10 > log/cora.log 2>&1 &
 
 # Citeseer
-python -u main.py --dataset citeseer  --alpha 100 --dom_num 10  --num_sample 8
+nohup python -u main.py --dataset citeseer  --alpha 100 --dom_num 10 --num_sample 8 --device 1 > log/citeseer_a10.log 2>&1 &
 
 # Reddit
-python -u main.py --dataset reddit --alpha 10 --dom_num 10 --num_sample 4 --perturb_size 1e-3
+nohup python -u main.py --dataset reddit --alpha 10 --dom_num 10 --num_sample 4 --perturb_size 1e-3 --device 2 > log/reddit.log 2>&1 &
 
 # ogbn-products
-python -u main.py --dataset ogbproducts --alpha 10 --dom_num 10 --num_sample 4 --perturb_size 1e-3
+nohup python -u main.py --dataset ogbproducts --alpha 10 --dom_num 10 --num_sample 4 --perturb_size 1e-3 --device 3 > log/ogbproducts.log 2>&1 &
 
 # ogbn-arxiv
-nohup python -u main.py --dataset ogbarxiv --alpha 10 --dom_num 10 --perturb_size 1e-3
+nohup nohup python -u main.py --dataset ogbarxiv --alpha 10 --dom_num 10 --perturb_size 1e-3 > log/ogbarxiv.log 2>&1 &
 
 
-# Evasion attack  (nettack, PGD, G-NIA, TDGIA) at testing time
+# Evasion attack  (nettack, PGD, TDGIA, and G-NIA) at testing time
 # Cora
-python -u test.py --dataset cora 
+nohup python -u test.py --dataset cora > log/eva_cora.log 2>&1 &
 
 # Citeseer
-python -u test.py --dataset citeseer 
+nohup python -u test.py --suffix a10 --dataset citeseer  > log/eva_citeseer_a10.log 2>&1 &
 
 # Reddit
-python -u test.py --dataset reddit 
+nohup python -u test.py --dataset reddit  > log/eva_reddit.log 2>&1 &
 
 # ogbn-products
-python -u test.py --dataset ogbproducts 
+nohup python -u test.py --dataset ogbproducts  > log/eva_ogbproducts.log 2>&1 &
 
 # ogbn-arxiv
-nohup python -u test.py --dataset ogbarxiv
+nohup nohup python -u test.py --dataset ogbarxiv  > log/eva_ogbarxiv.log 2>&1 &
