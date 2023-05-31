@@ -1,225 +1,268 @@
+import os,sys
+# os.chdir(sys.path[0])
 import numpy as np
-import scipy.sparse as sp
-import csv
-import pandas as pd
-import os, sys
-import argparse
 import torch
+import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.data as Data
-from copy import deepcopy
-from deeprobust.graph.utils import *
-from deeprobust.graph.data import Dataset
-import argparse
-from idea import IDEA
+from torch.autograd import Variable
+from audtorch.metrics.functional import pearsonr
+
 from utils import *
-from utils import _fetch_data
+from gcn import GCN
 
 
-def training(model, adj_tensor, nor_adj_tensor, feat, labels, atk_idx, train_mask, val_mask, test_mask, nei_list, pert_tensor, col_idx, use_tr_idx):
-    torch_dataset = Data.TensorDataset(torch.LongTensor(train_mask))
-    batch_x = torch.tensor(train_mask)
-    # batch_size = opts['batch_size'] if opts['batch_size'] < train_mask.shape[0] else 64
-    batch_loader = Data.DataLoader(dataset=torch_dataset, batch_size=opts['batch_size'], num_workers=24)
-    iter_loader = iter(batch_loader)
-    optimizer_aug = torch.optim.AdamW([{'params':model.gl.parameters(), 'lr':args.lr_a}, {'params':model.fl.parameters(), 'lr':args.lr_f}])
-    optimizer_dom = torch.optim.AdamW(model.infdom.parameters(), lr=args.lr_e)
-    best_acc_val = 0
-    cur_patience = args.patience
-    for iteration in range(args.epochs + 1):
-        model.train()
-        for m in range(3):
-            if opts['batch_size'] < train_mask.shape[0]:
-                iter_loader, batch = _fetch_data(iter_dataloader=iter_loader, dataloader=batch_loader)
-                batch_x = batch[0]
-            total_loss, inv_loss, pearson_loss, irm_loss, logvar, z_max = model.all_update_dom_nei(feat, adj_tensor, nor_adj_tensor, labels, atk_idx, batch_x, nei_list, pert_tensor, col_idx, use_tr_idx)
-            if m == 0:
-                model.optimizer.zero_grad()
-                total_loss.backward()
-                model.optimizer.step()
-            elif m == 1:
-                gen_loss = - inv_loss
-                optimizer_aug.zero_grad()
-                gen_loss.backward()
-                optimizer_aug.step()
-            else:
-                infdom_loss = pearson_loss 
-                optimizer_dom.zero_grad()
-                infdom_loss.backward()
-                optimizer_dom.step()
-        model.eval()
-        logits = model.predict(feat, nor_adj_tensor)
-        train_acc = accuracy(logits[train_mask], labels[train_mask])
-        val_acc = accuracy(logits[val_mask], labels[val_mask])
-        if iteration % 200 == 0:
-            print("IT {:05d} | TotalLoss {:.4f} | GenLoss {:.4f} | InfdomLoss {:.4f} | zMax {:.4f} | TrainAcc {:.5f} | ValAcc: {:.5f} ".format(
-                    iteration, total_loss, gen_loss, infdom_loss, z_max, train_acc, val_acc))
-        if val_acc > best_acc_val:
-            best_acc_val = val_acc
-            weights = deepcopy(model.state_dict())
-            cur_patience = args.patience
+###MLP with lienar output
+class MLP(nn.Module):
+    def __init__(self, num_layers, input_dim, hidden_dim, output_dim, dropout=0):
+        '''
+            num_layers: number of layers in the neural networks (EXCLUDING the input layer). If num_layers=1, this reduces to linear model.
+            input_dim: dimensionality of input features
+            hidden_dim: dimensionality of hidden units at ALL layers
+            output_dim: number of classes for prediction
+            device: which device to use
+        '''
+    
+        super(MLP, self).__init__()
+
+        self.linear_or_not = True #default is linear model
+        self.num_layers = num_layers
+        self.dropout = dropout
+
+        if num_layers < 1:
+            raise ValueError("number of layers should be positive!")
+        elif num_layers == 1:
+            #Linear model
+            self.linear = nn.Linear(input_dim, output_dim)
         else:
-            cur_patience =  cur_patience - 1
-            # print('Early stopping cur_patience:', cur_patience)
+            #Multi-layer model
+            self.linear_or_not = False
+            self.linears = torch.nn.ModuleList()
+            self.batch_norms = torch.nn.ModuleList()
         
-        if cur_patience <= 0:
-            break
+            self.linears.append(nn.Linear(input_dim, hidden_dim))
+            for layer in range(num_layers - 2):
+                self.linears.append(nn.Linear(hidden_dim, hidden_dim))
+            self.linears.append(nn.Linear(hidden_dim, output_dim))
 
-    model.load_state_dict(weights)
-    model.eval()
-    logits = model.predict(feat, nor_adj_tensor)
-    logp = F.log_softmax(logits, dim=1)
-    val_acc = accuracy(logp[val_mask], labels[val_mask])
-    test_acc = accuracy(logp[test_mask], labels[test_mask])
+            for layer in range(num_layers - 1):
+                self.batch_norms.append(nn.BatchNorm1d((hidden_dim)))
 
-    print("Validate accuracy {:.4%}".format(val_acc))
-    print("Test accuracy {:.4%}".format(test_acc))
+    def forward(self, x):
+        if self.linear_or_not:
+            #If linear model
+            return self.linear(x)
+        else:
+            #If MLP
+            h = x
+            for layer in range(self.num_layers - 1):
+                h = F.relu(self.batch_norms[layer](self.linears[layer](h)))
+                h = F.dropout(x, self.dropout, training=self.training)
+            return self.linears[self.num_layers - 1](h)
 
-    return test_acc
 
+class Infdom(nn.Module):
+    def __init__(self, opts, z_dim, class_num, dropout=0):
+        super(Infdom, self).__init__()
+        self.dropout = dropout
+        self.lin1 = nn.Linear(z_dim, opts['hidden_dim_infdom'])
+        self.lin2 = nn.Linear(opts['hidden_dim_infdom'], class_num)
+        for lin in [self.lin1, self.lin2]:
+            nn.init.xavier_uniform_(lin.weight)
+            nn.init.zeros_(lin.bias)
+        self.lin_seq = nn.Sequential(
+            self.lin1, nn.ReLU(True), nn.Dropout(dropout), self.lin2, nn.Softmax(dim=1))
 
+    def forward(self, input):
+        out = self.lin_seq(input)
+        return out
 
-def main(opts):
-    dataset= opts['dataset']
-    suffix = opts['suffix']
-    prefile = './'
-    device = f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
-    print('device', device)
-    device = torch.device(device)
+class IDEA(nn.Module):
+    """Invariant DEfense against Adversarial attack on graphs"""
+    def __init__(self, input_dim, hid_dim, num_classes, dropout, tr_n, use_tr_n, n=2000, opts=None, device=None):
+        super(IDEA, self).__init__()
+        self.opts = opts
+        self.device = device
+        num_mlp_layers = opts['num_mlp_layers']
+        self.featurizer = GCN(input_dim, hid_dim, hid_dim, opts['num_layers'], dropout).to(device)
 
-    save_file = 'checkpoint/' + args.dataset + suffix
-    graph_file = f'attacked_graphs/poison/{args.dataset}/meta_' 
-    log_file = 'log/' + args.dataset + '_' + args.dataset + '.csv'
-    nei_list = np.aload(prefile + 'splits/neighbors/' + args.dataset + '_nei.npy')
-    target_nodes = np.load(prefile + 'splits/target_nodes/' + args.dataset+ '_tar.npy')
-
-    # if args.atk_idea == 0:
-    if args.dataset in ['citeseer','cora', 'pubmed']:
-        data = Dataset(root=prefile+'datasets/', name=args.dataset, setting='nettack')
-        adj, features, labels_np = data.adj, data.features, data.labels
-        train_mask, val_mask, test_mask = data.idx_train, data.idx_val, data.idx_test
-        n = adj.shape[0]
-        print('loading')
-    else:
-        adj, features, labels_np = load_npz(prefile + f'datasets/{args.dataset}.npz')
-        adj, features, labels_np, n = lcc_graph(adj, features, labels_np)
-        split = np.aload(prefile + 'splits/split_118/' + args.dataset+ '_split.npy').item()
-        train_mask, val_mask, test_mask = split['train'], split['val'], split['test']
-    adj.setdiag(1)
-    adj_tensor, nor_adj_tensor, feat, labels = graph_to_tensor(adj, features, labels_np, device)
-    if n > 100000:
-        pert_adj, _, use_tr_mask = load_npz(prefile + f'splits/perturbation/{args.dataset}_pert.npz')
-        pert_tensor = sparse_mx_to_torch_sparse_tensor(pert_adj).to(device)
-        col_idx = torch.LongTensor(train_mask.repeat(args.num_sample)).reshape(1,args.num_sample*train_mask.shape[0]).to(device)
-        use_tr_idx = torch.LongTensor(use_tr_mask).to(device)
-        tr_n, use_tr_n = train_mask.shape[0], use_tr_mask.shape[0]        
-    else:
-        pert_tensor = torch.ones(n, n, dtype=torch.int, device=device) - adj_tensor.to_dense() - adj_tensor.to_dense()
-        col_idx = torch.arange(0, n).unsqueeze(1).repeat(1, args.num_sample)
-        use_tr_idx = None
-        tr_n, use_tr_n = n, n
-    
-    atk_idx = torch.diag(torch.arange(args.num_atks)).to(device)
-    acc_test_arr = []
-    atk_flag = 0
-    pert_rate = np.arange(0.0, 0.25, 0.05)
-
-    for pert in pert_rate:
-        print('------------------- Perturbation', pert, '-------------------')
-        if pert > 0:
-            if dataset == 'ogbarxiv':
-                pert_rate = np.array([0])
-                break
-            else:
-                adj_tensor = torch.load(graph_file + f'{pert:.2f}.pt').to(device)
-                # print('adj',new_adj.to_dense().sum())
-                adj = sparse_tensor_to_torch_sparse_mx(adj_tensor)
-            adj.setdiag(1)
-            adj_tensor = sparse_mx_to_torch_sparse_tensor(adj).to(device)
-            nor_adj_tensor = normalize_tensor(adj_tensor)
-            atk_flag = 1
+        feat_dim = hid_dim
+        # VIB archs
+        if opts['enable_bn']:
+            self.encoder = torch.nn.Sequential(
+                nn.Linear(feat_dim, feat_dim),
+                nn.BatchNorm1d(feat_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(feat_dim, feat_dim),
+                nn.BatchNorm1d(feat_dim),
+                nn.ReLU(inplace=True)
+            )
+        else:
+            self.encoder = torch.nn.Sequential(
+                nn.Linear(feat_dim, feat_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(feat_dim, feat_dim),
+                nn.ReLU(inplace=True)
+            )
+        self.fc3_mu = nn.Linear(feat_dim, feat_dim) 
+        self.fc3_logvar = nn.Linear(feat_dim, feat_dim) 
+        self.g_classifier = MLP(num_mlp_layers, hid_dim, hid_dim, num_classes, dropout=self.opts['clf_dropout'])
+        self.gd_classifier = MLP(num_mlp_layers, hid_dim+opts['dom_num'], hid_dim+opts['dom_num'], num_classes, dropout=self.opts['clf_dropout'])
         
-        acc_test_arr_in = []
-        seeds = [120, 121, 122, 123, 124, 125, 126, 127, 128, 129]
-        for i in seeds:
-            setup_seed(i)
-            print('----------- Seed ',i, '-----------')
-            
-            model = IDEA(features.shape[1], args.hidden_channels, labels.max().item()+1, args.dropout, tr_n=tr_n, use_tr_n=use_tr_n, n=n, opts=opts, device=device).to(device)
-            
-            test_acc = training(model, adj_tensor, nor_adj_tensor, feat, labels, atk_idx, train_mask, val_mask, test_mask, nei_list, pert_tensor, col_idx, use_tr_idx)
-            if atk_flag == 0:
-                torch.save(model.state_dict(), save_file + f'_pert{pert:.2f}_seed' + str(i) + '_checkpoint.pt')  
-            print("Test accuracy {:.4f}".format(test_acc))
-            acc_test_arr.append(test_acc)
-            acc_test_arr_in.append(test_acc)
         
-        nseed = len(seeds)
-        ncol = int(len(acc_test_arr_in)/nseed)
-        acc_test_arr_in = np.array(acc_test_arr_in).reshape(nseed, ncol) * 100
-        acc_test_f_in = np.concatenate((acc_test_arr_in, acc_test_arr_in.mean(0).reshape(1, ncol), acc_test_arr_in.std(0).reshape(1, ncol)))
-        print('acc_test_arr', acc_test_arr_in.shape)
-        dataframe_test =  pd.DataFrame(acc_test_f_in[-2:])
-        with open(log_file, 'a') as f:
-            writer = csv.writer(f)
-            writer.writerow(['=====',args.suffix, f'_pert{pert:.2f}_seed','====='])
-            writer.writerow(['---Test ACC---'])
-        # dataframe = pd.DataFrame({u'graph_name_arr':graph_name_arr, u'acc_test':acc_test_arr, u'acc_target':acc_tar_arr})
-        dataframe_test.to_csv(log_file, mode='a', index=False)
+        self.optimizer = torch.optim.Adam(
+            list(self.featurizer.parameters()) + list(self.g_classifier.parameters()) + list(
+                self.gd_classifier.parameters()) + list(self.encoder.parameters()) + list(
+                self.fc3_mu.parameters()) + list(self.fc3_logvar.parameters()),
+            lr=self.opts["lr"],
+            weight_decay=self.opts['weight_decay']
+        )
+        self.n = n
+        self.gl = Graph_Editer(tr_n, use_tr_n, n, device)
+        self.fl = Feat_Editer((n, input_dim), opts['perturb_size'], device)
+        self.infdom = Infdom(opts, z_dim=hid_dim+opts['num_atks'], class_num=opts['dom_num'], dropout=dropout).cuda()
 
+    def encoder_fun(self, res_feat):
+        latent_z = self.encoder(res_feat)
+        mu = self.fc3_mu(latent_z)
+        logvar = self.fc3_logvar(latent_z)
+        return mu, logvar
+
+    def reparameterize(self, mu, logvar):
+        if self.training:
+            std = torch.exp(logvar / 2)
+            eps = torch.randn_like(std)
+            return torch.add(torch.mul(std, eps), mu)
+        else:
+            return mu
+
+
+    def all_update_dom_nei(self, feat, adj_tensor, nor_adj_tensor, labels, atk_idx, batch, nei_list, pert_tensor, col_idx, use_tr_idx):
+        nei_batch, sub_batch, batch = sample_neighbor(batch, nei_list)
+        atk_idx = atk_idx.repeat_interleave(batch.shape[0], dim=0)
+        z = self.featurizer(feat, nor_adj_tensor)
+        # structure
+        atk_nor_adj_tensor = self.gl(adj_tensor, pert_tensor, col_idx, self.n, self.opts['num_sample'], use_tr_idx)
+        atk_z_struc = self.featurizer(feat, atk_nor_adj_tensor)
+        # attributes
+        atk_feat = self.fl(feat)
+        atk_z_attr = self.featurizer(atk_feat, nor_adj_tensor)
+
+        ori_all_z = torch.cat((z[batch], atk_z_attr[batch], atk_z_struc[batch]))
+        all_labels = torch.cat((labels[batch], labels[batch], labels[batch]))
+        mu, logvar = self.encoder_fun(ori_all_z)
+        all_z = self.reparameterize(mu, logvar)
+
+        domain_class = self.infdom(torch.cat([all_z.detach(), atk_idx],1))
+        # calculate loss by parts
+        all_pred = self.g_classifier(all_z)
+        inv_loss = F.cross_entropy(all_pred[sub_batch], all_labels[sub_batch])
+        dom_loss = F.cross_entropy(self.gd_classifier(torch.cat([all_z[sub_batch], domain_class[sub_batch]], 1)), all_labels[sub_batch])
+        irm_loss = (inv_loss - dom_loss) ** 2
+        inv_loss_nei = F.cross_entropy(all_pred[nei_batch], all_labels[sub_batch])
+        dom_loss_nei = F.cross_entropy(self.gd_classifier(torch.cat([all_z[nei_batch], domain_class[sub_batch]], 1)), all_labels[sub_batch])
+        nei_loss = (inv_loss_nei - dom_loss_nei) ** 2
+
+        total_loss = inv_loss + dom_loss + self.opts['alpha'] * irm_loss + self.opts['alpha'] * nei_loss
+        tr = self.compute_dom_vect(all_pred[sub_batch], all_labels[sub_batch], ori_all_z[sub_batch], domain_class[sub_batch], self.device)
+        pearson_arr = torch.cat([pearsonr(tr[i], tr[j]) for j in range(len(tr)) for i in range(j+1, len(tr))])
+        pearson_loss = pearson_arr.sum()
+        return total_loss, inv_loss, pearson_loss, irm_loss, logvar, all_z.max().item()
+    
+
+    def compute_dom_vect(self, pred, labels, all_z, domain_class, device):
+        dom_label = domain_class.argmax(1)
+        eps_num = 100
+        tr = []
+        z_num, z_dim = all_z.shape
+        eps = torch.randn(eps_num, device=device)/100
+        # x = torch.randn(z_dim,1).to(device)
+        for idx in torch.unique(dom_label):
+            domidx = torch.where(dom_label==idx)[0]
+            XXx = (all_z[domidx].T.mul(pred[domidx, labels[domidx]] - 1)).sum(1)
+            Xeps = all_z[domidx].sum(0)*eps.sum()
+            tr.append(XXx - Xeps)
+        return tr
+
+
+    def rand_gen(self, feat, adj_tensor, perturb_size, num_sample, feat_budget):
+        n, nfeat = feat.shape
+        rand_pert_feat = torch.FloatTensor(*feat.shape).uniform_(-perturb_size, perturb_size).to(feat.device)
+        P = torch.softmax(torch.randn(feat.shape), dim=1)
+        S = torch.multinomial(P, num_samples=feat_budget)  # [n, s]
+        M = torch.zeros(n, nfeat, dtype=torch.float).to(feat.device)
+        row_idx = torch.arange(0, n).unsqueeze(1).repeat(1, feat_budget)
+        M[row_idx, S] = 1.
+        randatk_feat = feat + M * rand_pert_feat
         
-    nseed = len(seeds)
-    nrow = int(len(acc_test_arr)/nseed)
-    acc_test_arr = np.array(acc_test_arr).reshape(nrow, nseed) * 100
-    # acc_test_f = np.concatenate((acc_test_arr, acc_test_arr.mean(1).reshape(nrow,1), acc_test_arr.std(0).reshape(nrow, 1)))
-    print('acc_test_arr', acc_test_arr.shape)
-    dataframe_test =  pd.DataFrame({u'pert_rate':pert_rate, u'mean':acc_test_arr.mean(1), u'std':acc_test_arr.std(1)})
-    with open(log_file, 'a') as f:
-        writer = csv.writer(f)
-        writer.writerow(['=====',args.suffix, f'all','====='])
-        writer.writerow(['---Test ACC---'])
-    # dataframe = pd.DataFrame({u'graph_name_arr':graph_name_arr, u'acc_test':acc_test_arr, u'acc_target':acc_tar_arr})
-    dataframe_test.to_csv(log_file, mode='a', index=False)
+        A = adj_tensor.to_dense()
+        rand_pert_adj = torch.randn(*adj_tensor.shape).to(feat.device)
+        A_c = torch.ones(n, n, dtype=torch.int).to(self.device) - A
+        P = torch.softmax(rand_pert_adj, dim=0)
+        S = torch.multinomial(P, num_samples=num_sample)  # [n, s]
+        M = torch.zeros(n, n, dtype=torch.float).to(feat.device)
+        col_idx = torch.arange(0, n).unsqueeze(1).repeat(1, num_sample)
+        M[S, col_idx] = 1.
+        randatk_adj_tensor = A + M * (A_c - A)
 
-
-
-if __name__ == '__main__':
+        randatk_nor_adj_tensor = normalize_tensor(randatk_adj_tensor.to_sparse())
+        return randatk_feat, randatk_nor_adj_tensor
     
-    parser = argparse.ArgumentParser(description='IDEA')
+    def predict(self, feat, nor_adj_tensor):
+        z = self.featurizer(feat, nor_adj_tensor)
+        # mu, logvar = self.encoder_fun(z[batch])
+        mu, logvar = self.encoder_fun(z)
+        z = self.reparameterize(mu, logvar)
+        y = self.g_classifier(z)
+        return y
 
 
-    parser.add_argument('--device', type=int, default=0)
-    parser.add_argument('--num_layers', type=int, default=2)
-    parser.add_argument('--hidden_channels', type=int, default=64)
-    parser.add_argument('--dropout', type=float, default=0.5)
-    parser.add_argument('--lr', type=float, default=5e-4)
-    parser.add_argument('--weight_decay', type=float, default=1e-5)
-    parser.add_argument('--epochs', type=int, default=5000)
-    
-    parser.add_argument('--dataset', type=str, default='cora')
-    parser.add_argument('--suffix', type=str, default='')
-    parser.add_argument('--atk_suffix', type=str, default='seed123')
-    parser.add_argument('--batch_size', type=int,default=256)
-    parser.add_argument('--patience', type=int,default=500)
+class Graph_Editer(nn.Module):
+    def __init__(self, tr_n, use_tr_n, n, device):
+        super(Graph_Editer, self).__init__()
+        self.B = nn.Parameter(torch.FloatTensor(tr_n, use_tr_n))
+        self.tr_n = tr_n
+        self.n = n
+        self.device = device
+        self.reset_parameters()
 
-    parser.add_argument('--alpha', type=int,default=100)
-    parser.add_argument('--dom_num', type=int, default=10)
-    parser.add_argument('--lr_e', type=float, default=1e-4,  help='learning rate for inferring environment')
-    parser.add_argument('--hidden_dim_infdom', type=int, default=16)
-    parser.add_argument('--clf_dropout', type=float, default=0)
+    def reset_parameters(self):
+        nn.init.uniform_(self.B)
+
+    def forward(self, adj_tensor, pert_tensor, col_idx, n, num_sample, use_tr_idx=None):
+        if n > 100000:
+            return self.sparse_forward(adj_tensor, pert_tensor, col_idx, n, num_sample, use_tr_idx)
+        else:
+            return self.dense_forward(adj_tensor, pert_tensor, col_idx, n, num_sample)
+        
+    def dense_forward(self, adj_tensor, pert_tensor, col_idx, n, num_sample):
+        P = torch.softmax(self.B, dim=0)
+        S = torch.multinomial(P, num_samples=num_sample)  # [n, s]
+        M = torch.zeros(n, n, dtype=torch.float, device=self.device)
+        M[S, col_idx] = 1.
+        C = adj_tensor.to_dense() + M * pert_tensor
+        return normalize_tensor(C.to_sparse())
     
-    parser.add_argument('--enable_bn', type=bool,default=True)
-    parser.add_argument('--num_mlp_layers', type=int,default=2)
-    parser.add_argument('--num_atks', type=int,default=3)
-    parser.add_argument('--perturb_size', type=float, default=1e-3, help='feature adversarial examples: initial perturbation')
-    parser.add_argument('--lr_f', type=float, default=1e-4,  help='learning rate for feature adversarial examples')
-    parser.add_argument('--num_sample', type=int, default=4, help='structural adversarial example: attack budget')
-    parser.add_argument('--lr_a', type=float, default=1e-4, help='learning rate for structural adversarial examples')
-    
-      
-    
-    args = parser.parse_args()
-    opts = args.__dict__.copy()
-    print('opts', opts)
-    main(opts)
+    def sparse_forward(self, adj_tensor, pert_tensor, col_idx_sp, n, num_sample, use_tr_idx):
+        tr_n = self.tr_n
+        P = torch.softmax(self.B, dim=0)
+        S_0_sp = torch.multinomial(P, num_samples=num_sample).flatten() 
+        S_sp = use_tr_idx[S_0_sp].reshape(1, num_sample*tr_n)
+        indices = torch.cat([S_sp, col_idx_sp],dim=0)
+        values = torch.ones(tr_n*num_sample, device=self.device)
+        M = torch.sparse.FloatTensor(indices, values, torch.Size([n,n]))
+        return normalize_tensor(adj_tensor + M.mul(pert_tensor))
+
+
+class Feat_Editer(nn.Module):
+    def __init__(self, feat_shape, perturb_size, device):
+        super(Feat_Editer, self).__init__()
+        self.feat_perturb = nn.Parameter(torch.FloatTensor(torch.Size(feat_shape)).uniform_(-perturb_size, perturb_size).to(device))
+        self.device = device
+
+    def reset_parameters(self):
+        nn.init.uniform_(self.B)
+
+    # def forward(self, edge_index, n, num_sample, k):
+    def forward(self, feat):
+        return feat + self.feat_perturb
