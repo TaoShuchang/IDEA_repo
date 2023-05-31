@@ -1,11 +1,9 @@
 import numpy as np
 import scipy.sparse as sp
-import time
 import csv
 import pandas as pd
 import os, sys
 import argparse
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -214,7 +212,7 @@ if __name__ == '__main__':
     parser.add_argument('--enable_bn', type=bool,default=True)
     parser.add_argument('--num_mlp_layers', type=int,default=2)
     parser.add_argument('--num_atks', type=int,default=3)
-    parser.add_argument('--perturb_size', type=float, default=1e-4, help='feature adversarial examples: initial perturbation')
+    parser.add_argument('--perturb_size', type=float, default=1e-3, help='feature adversarial examples: initial perturbation')
     parser.add_argument('--lr_f', type=float, default=1e-4,  help='learning rate for feature adversarial examples')
     parser.add_argument('--num_sample', type=int, default=4, help='structural adversarial example: attack budget')
     parser.add_argument('--lr_a', type=float, default=1e-4, help='learning rate for structural adversarial examples')
