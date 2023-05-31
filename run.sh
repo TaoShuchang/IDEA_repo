@@ -3,7 +3,7 @@
 nohup python -u main.py --dataset cora --alpha 100  --dom_num 10 > log/cora.log 2>&1 &
 
 # Citeseer
-nohup python -u main.py --dataset citeseer  --alpha 100 --dom_num 10 --num_sample 8 --device 1 > log/citeseer_a10.log 2>&1 &
+nohup python -u main.py --dataset citeseer  --alpha 100 --dom_num 10 --num_sample 8 --device 1 > log/citeseer.log 2>&1 &
 
 # Reddit
 nohup python -u main.py --dataset reddit --alpha 10 --dom_num 10 --num_sample 4 --perturb_size 1e-3 --device 2 > log/reddit.log 2>&1 &
