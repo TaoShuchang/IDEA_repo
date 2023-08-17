@@ -127,13 +127,14 @@ def main(opts):
             adj_tensor = sparse_mx_to_torch_sparse_tensor(adj).to(device)
             nor_adj_tensor = normalize_tensor(adj_tensor)
             atk_flag = 1
-        
-        if n > 100000:
+        # for ogbn-arxiv which is excluded in poisoning MetaAttack since MetaAttack cannot handle large graphs.
+        if n > 100000:   
             pert_adj, _, use_tr_mask = load_npz(prefile + f'splits/perturbation/{args.dataset}_pert.npz')
             pert_tensor = sparse_mx_to_torch_sparse_tensor(pert_adj).to(device)
             col_idx = torch.LongTensor(train_mask.repeat(args.num_sample)).reshape(1,args.num_sample*train_mask.shape[0]).to(device)
             use_tr_idx = torch.LongTensor(use_tr_mask).to(device)
             tr_n, use_tr_n = train_mask.shape[0], use_tr_mask.shape[0]        
+        # for Cora, Citeseer, Reddit, and ogbn-products, which are adopted in poisoning MetaAttack.
         else:
             pert_tensor = torch.ones(n, n, dtype=torch.int, device=device) - adj_tensor.to_dense() - adj_tensor.to_dense()
             col_idx = torch.arange(0, n).unsqueeze(1).repeat(1, args.num_sample)
