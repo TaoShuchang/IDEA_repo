@@ -124,8 +124,8 @@ class IDEA(nn.Module):
             weight_decay=self.opts['weight_decay']
         )
         self.n = n
-        self.gl = Graph_Editer(tr_n, use_tr_n, n, device)
-        self.fl = Feat_Editer((n, input_dim), opts['perturb_size'], device)
+        self.gl = Struct_Attack(tr_n, use_tr_n, n, device)
+        self.fl = Feat_Attack((n, input_dim), opts['perturb_size'], device)
         self.infdom = Infdom(opts, z_dim=hid_dim+opts['num_atks'], class_num=opts['dom_num'], dropout=dropout).cuda()
 
     def encoder_fun(self, res_feat):
@@ -223,9 +223,9 @@ class IDEA(nn.Module):
         return y
 
 
-class Graph_Editer(nn.Module):
+class Struct_Attack(nn.Module):
     def __init__(self, tr_n, use_tr_n, n, device):
-        super(Graph_Editer, self).__init__()
+        super(Struct_Attack, self).__init__()
         self.B = nn.Parameter(torch.FloatTensor(tr_n, use_tr_n))
         self.tr_n = tr_n
         self.n = n
@@ -260,9 +260,9 @@ class Graph_Editer(nn.Module):
         return normalize_tensor(adj_tensor + M.mul(pert_tensor))
 
 
-class Feat_Editer(nn.Module):
+class Feat_Attack(nn.Module):
     def __init__(self, feat_shape, perturb_size, device):
-        super(Feat_Editer, self).__init__()
+        super(Feat_Attack, self).__init__()
         self.feat_perturb = nn.Parameter(torch.FloatTensor(torch.Size(feat_shape)).uniform_(-perturb_size, perturb_size).to(device))
         self.device = device
 
