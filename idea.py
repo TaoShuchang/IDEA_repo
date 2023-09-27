@@ -124,8 +124,8 @@ class IDEA(nn.Module):
             weight_decay=self.opts['weight_decay']
         )
         self.n = n
-        self.gl = Struct_Attack(tr_n, use_tr_n, n, device)
-        self.fl = Feat_Attack((n, input_dim), opts['perturb_size'], device)
+        self.struct_atk = Struct_Attack(tr_n, use_tr_n, n, device)
+        self.feat_atk = Feat_Attack((n, input_dim), opts['perturb_size'], device)
         self.infdom = Infdom(opts, z_dim=hid_dim+opts['num_atks'], class_num=opts['dom_num'], dropout=dropout).cuda()
 
     def encoder_fun(self, res_feat):
@@ -148,10 +148,10 @@ class IDEA(nn.Module):
         atk_idx = atk_idx.repeat_interleave(batch.shape[0], dim=0)
         z = self.featurizer(feat, nor_adj_tensor)
         # structure
-        atk_nor_adj_tensor = self.gl(adj_tensor, pert_tensor, col_idx, self.n, self.opts['num_sample'], use_tr_idx)
+        atk_nor_adj_tensor = self.struct_atk(adj_tensor, pert_tensor, col_idx, self.n, self.opts['num_sample'], use_tr_idx)
         atk_z_struc = self.featurizer(feat, atk_nor_adj_tensor)
         # attributes
-        atk_feat = self.fl(feat)
+        atk_feat = self.feat_atk(feat)
         atk_z_attr = self.featurizer(atk_feat, nor_adj_tensor)
 
         ori_all_z = torch.cat((z[batch], atk_z_attr[batch], atk_z_struc[batch]))
