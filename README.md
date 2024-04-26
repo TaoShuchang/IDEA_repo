@@ -2,8 +2,8 @@
 
 **This repository is our Pytorch implementation of our paper:**
 
-**[IDEA: Invariant Causal Learning for Graph Adversarial Robustness against Attacks](https://openreview.net/forum?id=gdkVF0pDrC)**
-Submitted to IJCAI 2024 
+**[IDEA: Invariant Causal Learning for Graph Adversarial Robustness against Attacks](https://arxiv.org/abs/2305.15792)**
+Submitted to Information Sciences
 
 ## Datasets and splits
 
